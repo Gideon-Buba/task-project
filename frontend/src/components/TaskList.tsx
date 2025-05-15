@@ -1,28 +1,27 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  dueDate: string;
-  priority: "High" | "Medium" | "Low";
-  status: boolean;
-}
+import { getTasks, addTask } from "../api/taskApi";
+import type { Task } from "../api/types";
 
 const TaskList: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+  const [newTask, setNewTask] = useState<Omit<Task, "id" | "status">>({
+    title: "",
+    description: "",
+    dueDate: "",
+    priority: "Medium",
+  });
 
   useEffect(() => {
     const fetchTasks = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get("http://localhost:3000/tasks");
-        setTasks(response.data);
+        const tasksData = await getTasks();
+        setTasks(tasksData);
       } catch (error) {
         console.error("Error fetching tasks:", error);
       } finally {
@@ -39,12 +38,26 @@ const TaskList: React.FC = () => {
       task.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleAddTask = async () => {
+    try {
+      const addedTask = await addTask(newTask);
+      setTasks([...tasks, addedTask]);
+      setIsAddTaskModalOpen(false);
+      setNewTask({
+        title: "",
+        description: "",
+        dueDate: "",
+        priority: "Medium",
+      });
+    } catch (error) {
+      console.error("Error adding task:", error);
+    }
+  };
+
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: "home" },
-    { id: "projects", label: "Projects", icon: "briefcase" },
     { id: "calendar", label: "Calendar", icon: "calendar" },
     { id: "notifications", label: "Notifications", icon: "bell" },
-    { id: "search", label: "Search", icon: "search" },
   ];
 
   const priorityColors = {
@@ -131,6 +144,7 @@ const TaskList: React.FC = () => {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          onClick={() => setIsAddTaskModalOpen(true)}
           className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all mb-8 flex items-center"
         >
           <i className="fas fa-plus mr-2"></i>
@@ -247,6 +261,108 @@ const TaskList: React.FC = () => {
           </div>
         </section>
       </main>
+
+      {/* Add Task Modal */}
+      {isAddTaskModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-white rounded-xl p-8 w-full max-w-md shadow-xl"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-800">Add New Task</h3>
+              <button
+                onClick={() => setIsAddTaskModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="fas fa-times text-xl"></i>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={newTask.title}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, title: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter task title"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={newTask.description}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, description: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                  placeholder="Enter task description"
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={newTask.dueDate}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, dueDate: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  value={newTask.priority}
+                  onChange={(e) =>
+                    setNewTask({
+                      ...newTask,
+                      priority: e.target.value as "High" | "Medium" | "Low",
+                    })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setIsAddTaskModalOpen(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddTask}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  Add Task
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
