@@ -1,4 +1,3 @@
-// Dashboard.tsx
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getTasks, addTask } from "../api/taskApi";
