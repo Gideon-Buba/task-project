@@ -7,10 +7,16 @@ const Dashboard: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
-  const [newTask, setNewTask] = useState<Omit<Task, "id" | "status">>({
+  const [newTask, setNewTask] = useState<
+    Omit<
+      Task,
+      "id" | "status" | "dueDateTime" | "notificationTime" | "createdAt"
+    >
+  >({
     title: "",
     description: "",
     dueDate: "",
+    dueTime: "12:00", // Default time
     priority: "Medium",
   });
 
@@ -42,6 +48,7 @@ const Dashboard: React.FC = () => {
         title: "",
         description: "",
         dueDate: "",
+        dueTime: "12:00",
         priority: "Medium",
       });
     } catch (error) {
@@ -126,16 +133,20 @@ const Dashboard: React.FC = () => {
               <table className="w-full text-left">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    {["Status", "Title", "Due Date", "Priority"].map(
-                      (header) => (
-                        <th
-                          key={header}
-                          className="p-4 text-sm font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          {header}
-                        </th>
-                      )
-                    )}
+                    {[
+                      "Status",
+                      "Title",
+                      "Due Date",
+                      "Due Time",
+                      "Priority",
+                    ].map((header) => (
+                      <th
+                        key={header}
+                        className="p-4 text-sm font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        {header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -178,6 +189,11 @@ const Dashboard: React.FC = () => {
                             }`}
                           >
                             {new Date(task.dueDate).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-xs text-gray-500">
+                            {task.dueTime}
                           </div>
                         </td>
                         <td className="p-4">
@@ -267,6 +283,20 @@ const Dashboard: React.FC = () => {
                   value={newTask.dueDate}
                   onChange={(e) =>
                     setNewTask({ ...newTask, dueDate: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Due Time
+                </label>
+                <input
+                  type="time"
+                  value={newTask.dueTime}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, dueTime: e.target.value })
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
