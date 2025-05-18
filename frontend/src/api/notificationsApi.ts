@@ -1,11 +1,11 @@
 import axios from "axios";
 import type { Task } from "../api/types";
 
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = "http://localhost:3000/api/notifications";
 
 export const getUpcomingTasks = async (): Promise<Task[]> => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/tasks/upcoming`);
+    const response = await axios.get(`${API_BASE_URL}/upcoming`);
     return response.data.map((task: any) => ({
       ...task,
       dueDateTime: new Date(task.dueDateTime),

@@ -17,7 +17,18 @@ const calculateNotificationTime = (dueDateTime: Date): Date => {
 };
 
 export const getTasks = (req: Request, res: Response) => {
-  res.json(tasks);
+  const tasksToReturn = tasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    dueDate: task.dueDate,
+    dueTime: task.dueTime,
+    priority: task.priority,
+    status: task.status,
+  }));
+
+  console.log(tasksToReturn);
+  res.json(tasksToReturn);
 };
 
 export const addTask = (req: Request, res: Response) => {

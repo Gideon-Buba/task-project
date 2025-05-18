@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getTasks, addTask } from "../api/taskApi";
+import { getTasks, addTask, deleteTask, updateTask } from "../api/taskApi";
 import type { Task } from "../api/types";
 
 const Dashboard: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [newTask, setNewTask] = useState<
     Omit<
       Task,
@@ -16,7 +18,7 @@ const Dashboard: React.FC = () => {
     title: "",
     description: "",
     dueDate: "",
-    dueTime: "12:00", // Default time
+    dueTime: "12:00",
     priority: "Medium",
   });
 
@@ -24,7 +26,12 @@ const Dashboard: React.FC = () => {
     const fetchTasks = async () => {
       try {
         const tasksData = await getTasks();
-        setTasks(tasksData);
+        // Ensure each task has a unique ID
+        const tasksWithIds = tasksData.map((task, index) => ({
+          ...task,
+          id: task.id || `temp-${index}-${Date.now()}`, // Add unique temp ID if missing
+        }));
+        setTasks(tasksWithIds);
       } catch (error) {
         console.error("Error fetching tasks:", error);
       }
@@ -35,8 +42,10 @@ const Dashboard: React.FC = () => {
 
   const filteredTasks = tasks.filter(
     (task) =>
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (task.title?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+      (task.description?.toLowerCase() || "").includes(
+        searchQuery.toLowerCase()
+      )
   );
 
   const handleAddTask = async () => {
@@ -53,6 +62,33 @@ const Dashboard: React.FC = () => {
       });
     } catch (error) {
       console.error("Error adding task:", error);
+    }
+  };
+
+  const handleDeleteTask = async (id: string) => {
+    setTaskToDelete(id);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete) return;
+
+    try {
+      await deleteTask(taskToDelete);
+      setTasks(tasks.filter((task) => task.id !== taskToDelete));
+      setIsDeleteConfirmOpen(false);
+      setTaskToDelete(null);
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
+  };
+
+  const handleStatusChange = async (task: Task) => {
+    try {
+      const updatedTask = await updateTask(task.id, { status: !task.status });
+      setTasks(tasks.map((t) => (t.id === task.id ? updatedTask : t)));
+    } catch (error) {
+      console.error("Error updating task status:", error);
     }
   };
 
@@ -139,6 +175,7 @@ const Dashboard: React.FC = () => {
                       "Due Date",
                       "Due Time",
                       "Priority",
+                      "Actions",
                     ].map((header) => (
                       <th
                         key={header}
@@ -153,7 +190,7 @@ const Dashboard: React.FC = () => {
                   <AnimatePresence>
                     {filteredTasks.map((task) => (
                       <motion.tr
-                        key={task.id}
+                        key={task.id} // Using the unique ID as key
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, x: -50 }}
@@ -165,6 +202,7 @@ const Dashboard: React.FC = () => {
                             <input
                               type="checkbox"
                               checked={task.status}
+                              onChange={() => handleStatusChange(task)} // Added onChange handler
                               className="form-checkbox text-blue-600 rounded focus:ring-blue-500 focus:ring-2"
                             />
                             <span className="ml-2 text-gray-600">
@@ -205,14 +243,18 @@ const Dashboard: React.FC = () => {
                             >
                               {task.priority}
                             </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex space-x-2">
                             <motion.button
                               whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
-                              className={`ml-2 p-1 rounded-full ${
-                                priorityTextColors[task.priority]
-                              }`}
+                              className="p-2 text-red-500 hover:text-red-700 transition"
+                              onClick={() => handleDeleteTask(task.id)}
+                              title="Delete task"
                             >
-                              <i className="fas fa-ellipsis-h"></i>
+                              <i className="fas fa-trash"></i>
                             </motion.button>
                           </div>
                         </td>
@@ -334,6 +376,44 @@ const Dashboard: React.FC = () => {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
                   Add Task
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl"
+          >
+            <div className="flex flex-col items-center text-center">
+              <i className="fas fa-exclamation-triangle text-yellow-500 text-4xl mb-4"></i>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">
+                Confirm Deletion
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this task? This action cannot be
+                undone.
+              </p>
+              <div className="flex justify-center space-x-4 w-full">
+                <button
+                  onClick={() => {
+                    setIsDeleteConfirmOpen(false);
+                    setTaskToDelete(null);
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteTask}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex-1"
+                >
+                  Delete
                 </button>
               </div>
             </div>

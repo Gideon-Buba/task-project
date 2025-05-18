@@ -14,7 +14,7 @@ export interface Task {
   createdAt?: Date; // Optional creation timestamp
 }
 
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = "http://localhost:3000/api";
 
 export const getTasks = async (): Promise<Task[]> => {
   try {
@@ -23,8 +23,14 @@ export const getTasks = async (): Promise<Task[]> => {
     return response.data.map((task: any) => {
       const dueDateTime = new Date(`${task.dueDate}T${task.dueTime}:00`);
       return {
-        ...task,
+        id: task.id, // Make sure to include the ID
+        title: task.title,
+        description: task.description,
+        dueDate: task.dueDate,
+        dueTime: task.dueTime,
         dueDateTime,
+        priority: task.priority,
+        status: task.status,
         notificationTime: task.notificationTime
           ? new Date(task.notificationTime)
           : undefined,
