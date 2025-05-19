@@ -1,7 +1,13 @@
 import { Task } from "../models/Task";
-import { tasks } from "../controllers/taskController"; // Import the tasks array
+import { tasks } from "../controllers/taskController";
+import { Server } from "socket.io";
 
-// This would be called periodically (e.g., every minute) to check for tasks that need notifications
+let io: Server;
+
+export const setSocketIOInstance = (socketIOInstance: Server) => {
+  io = socketIOInstance;
+};
+
 export const checkForNotifications = async () => {
   try {
     const now = new Date();
@@ -9,14 +15,12 @@ export const checkForNotifications = async () => {
       return (
         task.notificationTime &&
         task.notificationTime <= now &&
-        !task.notificationSent // You would need to add this field to your Task model
+        !task.notificationSent
       );
     });
 
-    // Send notifications for these tasks
     tasksNeedingNotification.forEach((task: Task) => {
       sendNotification(task);
-      // Mark as notified
       task.notificationSent = true;
     });
   } catch (error) {
@@ -24,16 +28,14 @@ export const checkForNotifications = async () => {
   }
 };
 
-// In a real app, you would implement this based on your notification system
 const sendNotification = (task: Task) => {
   console.log(`Notification: Task "${task.title}" is due soon!`);
-  // Here you would implement actual notification logic
-  // For example, sending a push notification, email, etc.
+  if (io) {
+    io.emit("notification", task);
+  }
 };
 
-// Set up an interval to check for notifications periodically
 export const startNotificationService = () => {
-  // Check every minute
-  setInterval(checkForNotifications, 60000);
+  setInterval(checkForNotifications, 10000);
   console.log("Notification service started");
 };

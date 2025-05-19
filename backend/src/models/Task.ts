@@ -7,7 +7,7 @@ export interface Task {
   dueDateTime: Date;
   priority: "High" | "Medium" | "Low";
   status: boolean;
-  notificationTime?: Date;
-  notificationSent?: boolean;
-  createdAt?: Date;
+  notificationTime: Date;
+  notificationSent: boolean;
+  createdAt: Date;
 }

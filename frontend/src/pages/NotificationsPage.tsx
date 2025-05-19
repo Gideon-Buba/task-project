@@ -1,20 +1,43 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getUpcomingTasks } from "../api/notificationsApi";
+import {
+  getUpcomingTasks,
+  getCurrentNotifications,
+} from "../api/notificationsApi";
 import type { Task } from "../api/types";
 import { format, parseISO } from "date-fns";
+import { io, Socket } from "socket.io-client";
 
 const NotificationsPage: React.FC = () => {
   const [notifications, setNotifications] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
+    // Initialize WebSocket connection
+    const newSocket = io("http://localhost:3000");
+    setSocket(newSocket);
+
     const fetchNotifications = async () => {
       try {
         setIsLoading(true);
-        const tasks = await getUpcomingTasks();
-        setNotifications(tasks);
+        const [upcomingTasks, currentNotifications] = await Promise.all([
+          getUpcomingTasks(),
+          getCurrentNotifications(),
+        ]);
+
+        // Combine and deduplicate notifications
+        const allNotifications = [...currentNotifications, ...upcomingTasks];
+        const uniqueNotifications = allNotifications.reduce((acc, current) => {
+          const exists = acc.some((item) => item.id === current.id);
+          if (!exists) {
+            acc.push(current);
+          }
+          return acc;
+        }, [] as Task[]);
+
+        setNotifications(uniqueNotifications);
         setError(null);
       } catch (err) {
         console.error("Error fetching notifications:", err);
@@ -26,11 +49,41 @@ const NotificationsPage: React.FC = () => {
 
     fetchNotifications();
 
-    // Set up polling to refresh notifications every minute
-    const intervalId = setInterval(fetchNotifications, 60000);
+    // Set up polling to refresh notifications every 10 seconds
+    const intervalId = setInterval(fetchNotifications, 10000);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      if (newSocket) newSocket.disconnect();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("notification", (task: Task) => {
+      setNotifications((prev) => {
+        // Check if notification already exists
+        const exists = prev.some((n) => n.id === task.id);
+        if (exists) return prev;
+
+        // Add new notification
+        return [...prev, task];
+      });
+
+      // Play sound for high priority tasks
+      if (task.priority === "High") {
+        playNotificationSound();
+      }
+
+      // Show browser notification if permitted
+      showBrowserNotification(task);
+    });
+
+    return () => {
+      socket.off("notification");
+    };
+  }, [socket]);
 
   const markAsRead = (taskId: string) => {
     setNotifications(notifications.filter((task) => task.id !== taskId));
@@ -38,6 +91,34 @@ const NotificationsPage: React.FC = () => {
 
   const formatNotificationTime = (dateTime: Date) => {
     return format(parseISO(dateTime.toISOString()), "MMM d, yyyy 'at' h:mm a");
+  };
+
+  const playNotificationSound = () => {
+    const audio = new Audio("/notification-sound.mp3");
+    audio.play().catch((e) => console.error("Error playing sound:", e));
+  };
+
+  const showBrowserNotification = (task: Task) => {
+    if (!("Notification" in window)) {
+      console.log("This browser does not support notifications.");
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      new Notification(`Task Due: ${task.title}`, {
+        body: task.description,
+        icon: "/notification-icon.png",
+      });
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification(`Task Due: ${task.title}`, {
+            body: task.description,
+            icon: "/notification-icon.png",
+          });
+        }
+      });
+    }
   };
 
   const priorityColors = {
@@ -106,51 +187,67 @@ const NotificationsPage: React.FC = () => {
 
       <div className="space-y-3">
         <AnimatePresence>
-          {notifications.map((notification) => (
-            <motion.div
-              key={notification.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: 50 }}
-              transition={{ duration: 0.3 }}
-              className={`${
-                priorityColors[notification.priority]
-              } p-4 rounded-lg shadow-sm`}
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex items-start">
-                  <div className="mr-3 mt-1">
-                    <i
-                      className={`${priorityIcons[notification.priority]} ${
-                        priorityTextColors[notification.priority]
-                      }`}
-                    ></i>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-800">
-                      {notification.title}
-                    </h4>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {notification.description}
-                    </p>
-                    <div className="flex items-center mt-2">
-                      <i className="fas fa-clock text-gray-400 mr-2"></i>
-                      <span className="text-xs text-gray-500">
-                        Due {formatNotificationTime(notification.dueDateTime)}
-                      </span>
+          {notifications.map((notification) => {
+            const isDueNow = notification.notificationTime
+              ? new Date(notification.notificationTime) <= new Date()
+              : false;
+
+            return (
+              <motion.div
+                key={notification.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: 50 }}
+                transition={{ duration: 0.3 }}
+                className={`${
+                  isDueNow
+                    ? "bg-blue-50 border-l-4 border-blue-500"
+                    : priorityColors[notification.priority]
+                } p-4 rounded-lg shadow-sm`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex items-start">
+                    <div className="mr-3 mt-1">
+                      <i
+                        className={`${priorityIcons[notification.priority]} ${
+                          priorityTextColors[notification.priority]
+                        }`}
+                      ></i>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-800">
+                        {notification.title}
+                      </h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {notification.description}
+                      </p>
+                      <div className="flex items-center mt-2">
+                        <i className="fas fa-clock text-gray-400 mr-2"></i>
+                        <span className="text-xs text-gray-500">
+                          Due {formatNotificationTime(notification.dueDateTime)}
+                        </span>
+                      </div>
+                      {isDueNow && (
+                        <div className="mt-2 flex items-center">
+                          <i className="fas fa-bell text-blue-500 mr-2"></i>
+                          <span className="text-xs font-medium text-blue-700">
+                            This task is due now!
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
+                  <button
+                    onClick={() => markAsRead(notification.id)}
+                    className="text-gray-400 hover:text-gray-600 ml-2"
+                    title="Mark as read"
+                  >
+                    <i className="fas fa-times"></i>
+                  </button>
                 </div>
-                <button
-                  onClick={() => markAsRead(notification.id)}
-                  className="text-gray-400 hover:text-gray-600 ml-2"
-                  title="Mark as read"
-                >
-                  <i className="fas fa-times"></i>
-                </button>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
     </div>
