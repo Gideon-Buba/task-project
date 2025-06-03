@@ -3,6 +3,7 @@ import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import taskRoutes from "./routes/taskRoutes";
+import authRoutes from "./routes/authRoutes";
 import {
   startNotificationService,
   setSocketIOInstance,
@@ -35,6 +36,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/tasks", taskRoutes);
+app.use("/api/auth", authRoutes);
 
 // Start notification service
 startNotificationService();
