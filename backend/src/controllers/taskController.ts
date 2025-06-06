@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction, RequestHandler } from "express";
 import { Task } from "../models/Task";
 import { v4 as uuidv4 } from "uuid";
 import { authenticate } from "../middleware/auth";
@@ -15,7 +15,11 @@ const calculateNotificationTime = (dueDateTime: Date): Date => {
   return notificationTime;
 };
 
-export const getTasks = [
+// Define a type for route handlers
+type RouteHandler = (req: Request, res: Response) => void;
+
+// Define getTasks
+export const getTasks: [RequestHandler, RouteHandler] = [
   authenticate,
   (req: Request, res: Response) => {
     const tasksToReturn = tasks.map((task) => ({
@@ -32,11 +36,12 @@ export const getTasks = [
       createdAt: task.createdAt,
     }));
 
-    res.json(tasksToReturn);
+    res.json(tasksToReturn); // No explicit return
   },
 ];
 
-export const addTask = [
+// Define addTask
+export const addTask: [RequestHandler, RouteHandler] = [
   authenticate,
   (req: Request, res: Response) => {
     const taskData: Omit<
@@ -61,11 +66,12 @@ export const addTask = [
     };
 
     tasks.push(newTask);
-    res.status(201).json(newTask);
+    res.status(201).json(newTask); // No explicit return
   },
 ];
 
-export const updateTask = [
+// Define updateTask
+export const updateTask: [RequestHandler, RouteHandler] = [
   authenticate,
   (req: Request, res: Response) => {
     const { id } = req.params;
@@ -91,20 +97,22 @@ export const updateTask = [
     };
 
     tasks = tasks.map((task) => (task.id === id ? updatedTask : task));
-    res.json(updatedTask);
+    res.json(updatedTask); // No explicit return
   },
 ];
 
-export const deleteTask = [
+// Define deleteTask
+export const deleteTask: [RequestHandler, RouteHandler] = [
   authenticate,
   (req: Request, res: Response) => {
     const { id } = req.params;
     tasks = tasks.filter((task) => task.id !== id);
-    res.status(204).send();
+    res.status(204).send(); // No explicit return
   },
 ];
 
-export const getUpcomingTasks = [
+// Define getUpcomingTasks
+export const getUpcomingTasks: [RequestHandler, RouteHandler] = [
   authenticate,
   (req: Request, res: Response) => {
     const now = new Date();
@@ -116,11 +124,12 @@ export const getUpcomingTasks = [
       (a, b) => a.notificationTime.getTime() - b.notificationTime.getTime()
     );
 
-    res.json(upcomingTasks);
+    res.json(upcomingTasks); // No explicit return
   },
 ];
 
-export const getCurrentNotifications = [
+// Define getCurrentNotifications
+export const getCurrentNotifications: [RequestHandler, RouteHandler] = [
   authenticate,
   (req: Request, res: Response) => {
     const now = new Date();
@@ -132,6 +141,6 @@ export const getCurrentNotifications = [
       );
     });
 
-    res.json(currentNotifications);
+    res.json(currentNotifications); // No explicit return
   },
 ];
