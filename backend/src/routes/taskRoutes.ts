@@ -10,12 +10,11 @@ import {
 
 const router = express.Router();
 
-// Spread the arrays to pass middleware and handlers individually
-router.get("/tasks", ...getTasks);
-router.post("/tasks", ...addTask);
-router.put("/tasks/:id", ...updateTask);
-router.delete("/tasks/:id", ...deleteTask);
-router.get("/tasks/upcoming", ...getUpcomingTasks);
-router.get("/tasks/notifications", ...getCurrentNotifications);
+router.get("/", ...getTasks);
+router.post("/", ...addTask);
+router.put("/:id", ...updateTask);
+router.delete("/:id", ...deleteTask);
+router.get("/upcoming", ...getUpcomingTasks);
+router.get("/notifications", ...getCurrentNotifications);
 
 export default router;
