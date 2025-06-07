@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
 import { login } from "../api/authApi";
+import { useAuth } from "../context/AuthContext";
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState("");
@@ -9,6 +10,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login: authLogin } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,18 +19,21 @@ const Login: React.FC = () => {
 
     try {
       const { token } = await login({ username, password });
-      localStorage.setItem("token", token); // Store JWT token
+      // Update authentication state in context
+      authLogin(token);
+      // Redirect to dashboard
       navigate("/dashboard");
-    } catch {
-      setError("Invalid username or password");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Invalid username or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="w-full max-w-2xl mx-auto px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="w-full max-w-2xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -54,22 +59,28 @@ const Login: React.FC = () => {
             Login to Your Account
           </h2>
 
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6 p-4 bg-red-50 text-red-600 rounded-lg text-center border border-red-100"
-            >
-              <div className="flex items-center justify-center">
-                <i className="fas fa-exclamation-circle mr-2"></i>
-                <span>{error}</span>
-              </div>
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mb-6 p-4 bg-red-50 text-red-600 rounded-lg text-center border border-red-100"
+              >
+                <div className="flex items-center justify-center">
+                  <i className="fas fa-exclamation-circle mr-2"></i>
+                  <span>{error}</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Username
               </label>
               <div className="relative">
@@ -77,18 +88,23 @@ const Login: React.FC = () => {
                   <i className="fas fa-user text-gray-400"></i>
                 </div>
                 <input
+                  id="username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                   placeholder="Enter your username"
                   required
+                  autoComplete="username"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Password
               </label>
               <div className="relative">
@@ -96,12 +112,14 @@ const Login: React.FC = () => {
                   <i className="fas fa-lock text-gray-400"></i>
                 </div>
                 <input
+                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                   placeholder="Enter your password"
                   required
+                  autoComplete="current-password"
                 />
               </div>
             </div>
