@@ -20,7 +20,7 @@ export const getTasks = async (): Promise<Task[]> => {
   try {
     const response = await axios.get(`${API_BASE_URL}/tasks`);
     // Transform the response data to ensure proper Date objects
-    return response.data.map((task: any) => {
+    return response.data.map((task: Task) => {
       const dueDateTime = new Date(`${task.dueDate}T${task.dueTime}:00`);
       return {
         id: task.id, // Make sure to include the ID
