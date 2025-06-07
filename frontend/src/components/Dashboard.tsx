@@ -98,11 +98,11 @@ const Dashboard: React.FC = () => {
     Low: "bg-green-500",
   };
 
-  const priorityTextColors = {
-    High: "text-red-500",
-    Medium: "text-yellow-500",
-    Low: "text-green-500",
-  };
+  // const priorityTextColors = {
+  //   High: "text-red-500",
+  //   Medium: "text-yellow-500",
+  //   Low: "text-green-500",
+  // };
 
   return (
     <>

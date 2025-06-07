@@ -1,100 +1,146 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction, RequestHandler } from "express";
 import { Task } from "../models/Task";
 import { v4 as uuidv4 } from "uuid";
+import { authenticate } from "../middleware/auth";
 
 export let tasks: Task[] = [];
 
-// Helper function to combine date and time into a Date object
 const combineDateTime = (date: string, time: string): Date => {
   return new Date(`${date}T${time}`);
 };
 
-// Helper function to calculate notification time (1 hour before due time)
 const calculateNotificationTime = (dueDateTime: Date): Date => {
   const notificationTime = new Date(dueDateTime);
   notificationTime.setHours(notificationTime.getHours() - 1);
   return notificationTime;
 };
 
-export const getTasks = (req: Request, res: Response) => {
-  const tasksToReturn = tasks.map((task) => ({
-    id: task.id,
-    title: task.title,
-    description: task.description,
-    dueDate: task.dueDate,
-    dueTime: task.dueTime,
-    priority: task.priority,
-    status: task.status,
-  }));
+// Define a type for route handlers
+type RouteHandler = (req: Request, res: Response) => void;
 
-  console.log(tasksToReturn);
-  res.json(tasksToReturn);
-};
+// Define getTasks
+export const getTasks: [RequestHandler, RouteHandler] = [
+  authenticate,
+  (req: Request, res: Response) => {
+    const tasksToReturn = tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      dueDate: task.dueDate,
+      dueTime: task.dueTime,
+      priority: task.priority,
+      status: task.status,
+      dueDateTime: task.dueDateTime,
+      notificationTime: task.notificationTime,
+      notificationSent: task.notificationSent,
+      createdAt: task.createdAt,
+    }));
 
-export const addTask = (req: Request, res: Response) => {
-  const taskData: Omit<
-    Task,
-    "id" | "dueDateTime" | "notificationTime" | "createdAt"
-  > = req.body;
+    res.json(tasksToReturn); // No explicit return
+  },
+];
 
-  // Combine date and time
-  const dueDateTime = combineDateTime(taskData.dueDate, taskData.dueTime);
+// Define addTask
+export const addTask: [RequestHandler, RouteHandler] = [
+  authenticate,
+  (req: Request, res: Response) => {
+    const taskData: Omit<
+      Task,
+      | "id"
+      | "dueDateTime"
+      | "notificationTime"
+      | "notificationSent"
+      | "createdAt"
+    > = req.body;
 
-  // Calculate notification time (1 hour before due time)
-  const notificationTime = calculateNotificationTime(dueDateTime);
+    const dueDateTime = combineDateTime(taskData.dueDate, taskData.dueTime);
+    const notificationTime = calculateNotificationTime(dueDateTime);
 
-  const newTask: Task = {
-    ...taskData,
-    id: uuidv4(),
-    dueDateTime,
-    notificationTime,
-    createdAt: new Date(),
-  };
+    const newTask: Task = {
+      ...taskData,
+      id: uuidv4(),
+      dueDateTime,
+      notificationTime,
+      notificationSent: false,
+      createdAt: new Date(),
+    };
 
-  tasks.push(newTask);
-  res.status(201).json(newTask);
-};
+    tasks.push(newTask);
+    res.status(201).json(newTask); // No explicit return
+  },
+];
 
-export const updateTask = (req: Request, res: Response) => {
-  const { id } = req.params;
-  const taskData: Omit<Task, "id" | "dueDateTime" | "notificationTime"> =
-    req.body;
+// Define updateTask
+export const updateTask: [RequestHandler, RouteHandler] = [
+  authenticate,
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    const taskData: Omit<
+      Task,
+      | "id"
+      | "dueDateTime"
+      | "notificationTime"
+      | "notificationSent"
+      | "createdAt"
+    > = req.body;
 
-  // Combine date and time
-  const dueDateTime = combineDateTime(taskData.dueDate, taskData.dueTime);
+    const dueDateTime = combineDateTime(taskData.dueDate, taskData.dueTime);
+    const notificationTime = calculateNotificationTime(dueDateTime);
 
-  // Calculate notification time (1 hour before due time)
-  const notificationTime = calculateNotificationTime(dueDateTime);
+    const updatedTask: Task = {
+      ...taskData,
+      id,
+      dueDateTime,
+      notificationTime,
+      notificationSent: false,
+      createdAt: new Date(),
+    };
 
-  const updatedTask: Task = {
-    ...taskData,
-    id,
-    dueDateTime,
-    notificationTime,
-  };
+    tasks = tasks.map((task) => (task.id === id ? updatedTask : task));
+    res.json(updatedTask); // No explicit return
+  },
+];
 
-  tasks = tasks.map((task) => (task.id === id ? updatedTask : task));
-  res.json(updatedTask);
-};
+// Define deleteTask
+export const deleteTask: [RequestHandler, RouteHandler] = [
+  authenticate,
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    tasks = tasks.filter((task) => task.id !== id);
+    res.status(204).send(); // No explicit return
+  },
+];
 
-export const deleteTask = (req: Request, res: Response) => {
-  const { id } = req.params;
-  tasks = tasks.filter((task) => task.id !== id);
-  res.status(204).send();
-};
+// Define getUpcomingTasks
+export const getUpcomingTasks: [RequestHandler, RouteHandler] = [
+  authenticate,
+  (req: Request, res: Response) => {
+    const now = new Date();
+    const upcomingTasks = tasks.filter((task) => {
+      return task.notificationTime && task.notificationTime > now;
+    });
 
-// Add a new controller to get upcoming tasks with notifications
-export const getUpcomingTasks = (req: Request, res: Response) => {
-  const now = new Date();
-  const upcomingTasks = tasks.filter((task) => {
-    // Check if task has a notification time and it's in the future
-    return task.notificationTime && task.notificationTime > now;
-  });
+    upcomingTasks.sort(
+      (a, b) => a.notificationTime.getTime() - b.notificationTime.getTime()
+    );
 
-  // Sort by notification time (earliest first)
-  upcomingTasks.sort(
-    (a, b) => a.notificationTime!.getTime() - b.notificationTime!.getTime()
-  );
+    res.json(upcomingTasks); // No explicit return
+  },
+];
 
-  res.json(upcomingTasks);
-};
+// Define getCurrentNotifications
+export const getCurrentNotifications: [RequestHandler, RouteHandler] = [
+  authenticate,
+  (req: Request, res: Response) => {
+    const now = new Date();
+    const currentNotifications = tasks.filter((task) => {
+      return (
+        task.notificationTime &&
+        task.notificationTime <= now &&
+        !task.notificationSent
+      );
+    });
+
+    res.json(currentNotifications); // No explicit return
+  },
+];
